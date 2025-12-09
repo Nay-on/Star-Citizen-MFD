@@ -557,15 +557,15 @@ class SC_ControlDeck(QMainWindow):
         try:
             if self.boot_step < len(BOOT_SEQUENCE_LOGS): self.sys_overlay.add_log(BOOT_SEQUENCE_LOGS[self.boot_step]); self.boot_step += 1
             else: self.boot_timer.stop(); self.fade_timer = QTimer(); self.fade_timer.setInterval(50); self.fade_timer.timeout.connect(self.fade_out_boot); self.fade_timer.start()
-        except RuntimeError:
-            pass
+        except RuntimeError as e:
+            print(f"DIAGNOSTIC: Error in update_boot: {e}")
     def fade_out_boot(self):
         try:
             op = self.sys_overlay.opacity - 0.05
             if op <= 0: op = 0; self.fade_timer.stop(); self.sys_overlay.set_opacity(0)
             else: self.sys_overlay.set_opacity(op)
-        except RuntimeError:
-            pass
+        except RuntimeError as e:
+            print(f"DIAGNOSTIC: Error in fade_out_boot: {e}")
     def start_shutdown_sequence(self):
         self.cleanup_background_tasks()
         self.sys_overlay.set_mode("SHUTDOWN")
