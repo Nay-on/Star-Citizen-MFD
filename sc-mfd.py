@@ -501,14 +501,17 @@ class SC_ControlDeck(QMainWindow):
                 item.setData(Qt.ItemDataRole.UserRole, module_id) # Store the ID in the item
                 self.module_list.addItem(item)
                 module_widget.hide()
-    def closeEvent(self, event):
+    def cleanup_background_tasks(self):
         # Stop all running timers and threads to prevent RuntimeError on shutdown
         self.timer.stop()
         self.rss_refresh_timer.stop()
         self.hold_timer.stop()
         if self.rss_worker.isRunning():
             self.rss_worker.quit()
-            self.rss_worker.wait() # Wait for the thread to finish cleanly
+            self.rss_worker.wait()
+
+    def closeEvent(self, event):
+        self.cleanup_background_tasks()
 
         # Save the layout of modules currently on the grid
         layout_config = {}
@@ -539,7 +542,13 @@ class SC_ControlDeck(QMainWindow):
         op = self.sys_overlay.opacity - 0.05
         if op <= 0: op = 0; self.fade_timer.stop(); self.sys_overlay.set_opacity(0)
         else: self.sys_overlay.set_opacity(op)
-    def start_shutdown_sequence(self): self.sys_overlay.set_mode("SHUTDOWN"); self.shutdown_timer = QTimer(); self.shutdown_timer.setInterval(20); self.shutdown_timer.timeout.connect(self.update_shutdown); self.shutdown_timer.start()
+    def start_shutdown_sequence(self):
+        self.cleanup_background_tasks()
+        self.sys_overlay.set_mode("SHUTDOWN")
+        self.shutdown_timer = QTimer()
+        self.shutdown_timer.setInterval(20)
+        self.shutdown_timer.timeout.connect(self.update_shutdown)
+        self.shutdown_timer.start()
     def update_shutdown(self):
         scale = self.sys_overlay.shutdown_y_scale - 0.02
         if scale <= 0: scale = 0; self.shutdown_timer.stop(); self.close()
