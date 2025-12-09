@@ -634,22 +634,31 @@ class SC_ControlDeck(QMainWindow):
         h_btn = QVBoxLayout(); h_btn.setSpacing(10); sett=QPushButton("SYSTEM CONFIG"); sett.setStyleSheet("font-size: 18px; border: 2px solid #888888; color: #cccccc;"); sett.setMinimumHeight(80); sett.clicked.connect(self.open_settings)
         quit_btn=QPushButton("DISCONNECT"); quit_btn.setObjectName("close_btn"); quit_btn.setMinimumHeight(80); quit_btn.setStyleSheet("font-size: 18px; background-color: #330000; color: #ff5555; border: 2px solid #ff0000;"); quit_btn.clicked.connect(self.start_shutdown_sequence); h_btn.addWidget(sett); h_btn.addWidget(quit_btn); layout.addLayout(h_btn)
         return module
-    def update_telemetry(self): 
-        self.telemetry_tick_count += 1
-        if self.telemetry_tick_count % 300 == 0 or self.telemetry_tick_count == 1:
-            game_running = False
-            for proc in psutil.process_iter(['name']):
-                try:
-                    if proc.info['name'] == "StarCitizen.exe":
-                        game_running = True
-                        break
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess): pass
-            if game_running:
-                self.status_lbl.setText("SYSTEM STATUS: ONLINE")
-                self.status_lbl.setStyleSheet("color: #44ff44; font-weight: bold;")
-            else:
-                self.status_lbl.setText("SYSTEM STATUS: OFFLINE")
-                self.status_lbl.setStyleSheet("color: #ff4444; font-weight: bold;")
+    def update_telemetry(self):
+        try:
+            self.telemetry_tick_count += 1
+            if self.telemetry_tick_count % 300 == 0 or self.telemetry_tick_count == 1:
+                game_running = False
+                for proc in psutil.process_iter(['name']):
+                    try:
+                        if proc.info['name'] == "StarCitizen.exe":
+                            game_running = True
+                            break
+                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess): pass
+
+                if not hasattr(self, 'status_lbl') or not self.status_lbl:
+                    return
+
+                if game_running:
+                    self.status_lbl.setText("SYSTEM STATUS: ONLINE")
+                    self.status_lbl.setStyleSheet("color: #44ff44; font-weight: bold;")
+                else:
+                    self.status_lbl.setText("SYSTEM STATUS: OFFLINE")
+                    self.status_lbl.setStyleSheet("color: #ff4444; font-weight: bold;")
+        except RuntimeError:
+            # This defensively catches the "wrapped C/C++ object has been deleted" error,
+            # which can happen in rare race conditions during startup or shutdown.
+            pass
     def create_shield_facing_panel(self):
         module = DraggableModule("shield_array")
         layout = QVBoxLayout(module)
