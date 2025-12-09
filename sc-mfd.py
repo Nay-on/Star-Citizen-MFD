@@ -420,7 +420,7 @@ class SC_ControlDeck(QMainWindow):
         self.apply_styles()
 
         # Start sequences and background tasks after the main event loop has started
-        QTimer.singleShot(100, self.start_boot_sequence)
+        # QTimer.singleShot(100, self.start_boot_sequence) # Temporarily disabled for debugging
         QTimer.singleShot(200, self.start_background_tasks)
 
     def start_background_tasks(self):
