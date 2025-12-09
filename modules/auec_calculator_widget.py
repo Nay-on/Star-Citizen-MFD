@@ -1,7 +1,24 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
                              QPushButton, QListWidget, QListWidgetItem, QComboBox,
-                             QDialog, QDialogButtonBox)
+                             QDialog, QDialogButtonBox, QSpinBox)
 from PyQt6.QtCore import Qt
+
+class CrewMemberWidget(QWidget):
+    def __init__(self, name, parent=None):
+        super().__init__(parent)
+        self.name = name
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(5, 5, 5, 5)
+
+        self.name_label = QLabel(name)
+        layout.addWidget(self.name_label)
+        layout.addStretch()
+
+        self.percentage_spinbox = QSpinBox()
+        self.percentage_spinbox.setRange(0, 100)
+        self.percentage_spinbox.setSuffix("%")
+        layout.addWidget(self.percentage_spinbox)
 
 class AddMissionDialog(QDialog):
     """A dialog to add a new mission with a name and an amount."""
@@ -63,6 +80,10 @@ class AUECCalculatorWidget(QWidget):
         self.crew_list = QListWidget()
         main_layout.addWidget(self.crew_list)
 
+        update_percentages_btn = QPushButton("Update Percentages")
+        update_percentages_btn.clicked.connect(self.update_percentages)
+        main_layout.addWidget(update_percentages_btn)
+
         crew_input_layout = QHBoxLayout()
         self.crew_name_input = QLineEdit()
         self.crew_name_input.setPlaceholderText("Crew member name...")
@@ -111,8 +132,13 @@ class AUECCalculatorWidget(QWidget):
         name = self.crew_name_input.text()
         if name and name not in self.crew:
             self.crew[name] = 0 # Default percentage
-            item = QListWidgetItem(name)
+
+            item = QListWidgetItem(self.crew_list)
+            widget = CrewMemberWidget(name)
+            item.setSizeHint(widget.sizeHint())
             self.crew_list.addItem(item)
+            self.crew_list.setItemWidget(item, widget)
+
             self.crew_name_input.clear()
 
     def calculate_split(self):
@@ -135,7 +161,24 @@ class AUECCalculatorWidget(QWidget):
             self.results_display.setText(results_text)
 
         elif split_mode == "Split by Percentage":
-            self.results_display.setText("Percentage split is not yet implemented.")
+            total_percentage = sum(self.crew.values())
+            if total_percentage != 100:
+                self.results_display.setText(f"Total percentage must be 100%, but it is {total_percentage}%.")
+                return
+
+            results_text = "PERCENTAGE SPLIT:\n"
+            for name, percentage in self.crew.items():
+                share = self.total_auec * (percentage / 100)
+                results_text += f"- {name} ({percentage}%): {share:,.2f} aUEC\n"
+            self.results_display.setText(results_text)
+
+    def update_percentages(self):
+        for i in range(self.crew_list.count()):
+            item = self.crew_list.item(i)
+            widget = self.crew_list.itemWidget(item)
+            if widget:
+                self.crew[widget.name] = widget.percentage_spinbox.value()
+        self.results_display.setText("Percentages updated. Ready to calculate.")
 
     def update_total_display(self):
         self.total_display.setText(f"{self.total_auec} aUEC")

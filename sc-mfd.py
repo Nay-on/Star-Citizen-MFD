@@ -370,7 +370,8 @@ class SC_ControlDeck(QMainWindow):
         # The central widget will now be a container for the dock widgets
         self.setCentralWidget(main_widget)
 
-        self.grid_widget = GridWidget()
+        self.modules = self.create_all_modules()
+        self.grid_widget = GridWidget(self.modules)
         self.global_layout.addWidget(self.grid_widget)
 
         # Create the module drawer
@@ -390,8 +391,9 @@ class SC_ControlDeck(QMainWindow):
         if hasattr(self, 'action_overlay'): self.action_overlay.resize(self.size()); self.action_overlay.raise_()
         if hasattr(self, 'sys_overlay'): self.sys_overlay.resize(self.size()); self.sys_overlay.raise_()
         super().resizeEvent(event)
-    def setup_modules(self):
-        self.modules = {
+
+    def create_all_modules(self):
+        return {
             "flight_systems": self.create_systems_panel(),
             "shield_array": self.create_shield_facing_panel(),
             "power_distribution": self.create_power_increments_panel(),
@@ -400,6 +402,8 @@ class SC_ControlDeck(QMainWindow):
             "auec_calculator": self.create_auec_calculator_panel(),
             "team_management": self.create_team_management_panel()
         }
+
+    def setup_modules(self):
         layout_config = self.config.get("MODULE_LAYOUT")
 
         modules_on_grid = []

@@ -1,5 +1,42 @@
+import ast
+import operator
+
 from PyQt6.QtWidgets import QWidget, QGridLayout, QLineEdit, QPushButton, QVBoxLayout, QLabel
 from PyQt6.QtCore import Qt
+
+# --- Safe Evaluator ---
+ALLOWED_OPERATORS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+}
+
+def safe_eval(expr):
+    """
+    Safely evaluates a string expression containing basic arithmetic operations.
+    """
+    try:
+        node = ast.parse(expr, mode='eval').body
+    except (SyntaxError, ValueError):
+        raise ValueError("Invalid syntax")
+
+    def _eval(node):
+        if isinstance(node, ast.Num):
+            return node.n
+        elif isinstance(node, ast.Constant): # For Python 3.8+
+            return node.value
+        elif isinstance(node, ast.BinOp):
+            op = ALLOWED_OPERATORS.get(type(node.op))
+            if op is None:
+                raise ValueError(f"Operator not allowed: {type(node.op).__name__}")
+            left = _eval(node.left)
+            right = _eval(node.right)
+            return op(left, right)
+        else:
+            raise ValueError(f"Node type not allowed: {type(node).__name__}")
+
+    return _eval(node)
 
 class CalculatorWidget(QWidget):
     def __init__(self, parent=None):
@@ -56,7 +93,7 @@ class CalculatorWidget(QWidget):
 
         if text == "=":
             try:
-                result = str(eval(self.current_input))
+                result = str(safe_eval(self.current_input))
                 self.display.setText(result)
                 self.current_input = result
             except Exception:

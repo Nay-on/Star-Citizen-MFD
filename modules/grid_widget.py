@@ -2,8 +2,9 @@ from PyQt6.QtWidgets import QWidget, QGridLayout
 from modules.draggable_module import DraggableModule
 
 class GridWidget(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, modules_dict, parent=None):
         super().__init__(parent)
+        self.modules_dict = modules_dict
         self.layout = QGridLayout(self)
         self.layout.setSpacing(15)
         self.setAcceptDrops(True) # Important for drag-and-drop
@@ -20,8 +21,7 @@ class GridWidget(QWidget):
             return
 
         module_id = mime_data.text()
-        main_window = self.parent().parent().parent() # Kludgy way to get the main window
-        source_widget = main_window.modules.get(module_id)
+        source_widget = self.modules_dict.get(module_id)
 
         if source_widget is None:
             return
