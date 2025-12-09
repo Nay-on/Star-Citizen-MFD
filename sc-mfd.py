@@ -10,8 +10,8 @@ import xml.etree.ElementTree as ET
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QGridLayout, 
                              QWidget, QLabel, QVBoxLayout, QFrame, QHBoxLayout, 
                              QDialog, QScrollArea, QProgressBar, QTextEdit, QComboBox,
-                             QLineEdit, QFileDialog, QMessageBox, QTabWidget, QListWidget, QDockWidget, QListWidgetItem)
-from PyQt6.QtCore import Qt, QTimer, QTime, QRectF, QEvent, QPointF, QRect, QThread, pyqtSignal
+                             QLineEdit, QFileDialog, QMessageBox, QTabWidget, QListWidget, QDockWidget, QListWidgetItem, QBoxLayout)
+from PyQt6.QtCore import Qt, QTimer, QTime, QRectF, QEvent, QPointF, QRect, QThread, pyqtSignal, QPropertyAnimation
 from modules.clock_widget import ClockWidget
 from modules.draggable_module import DraggableModule
 from modules.grid_widget import GridWidget
@@ -24,7 +24,6 @@ from modules.shared_widgets import HoldButton
 from modules.calculator_widget import CalculatorWidget
 from modules.auec_calculator_widget import AUECCalculatorWidget
 from modules.team_management_widget import TeamManagementWidget
-from modules.module_drawer import ModuleDrawer
 from PyQt6.QtGui import QColor, QPalette, QBrush, QPainter, QPen, QPainterPath, QLinearGradient, QPolygonF, QFont, QRadialGradient
 
 class Controller:
@@ -239,6 +238,17 @@ class SettingsDialog(QDialog):
         current_idx = self.config.get("TARGET_SCREEN_INDEX", 1)
         if current_idx < len(QApplication.screens()): self.screen_combo.setCurrentIndex(current_idx)
         sl.addWidget(self.screen_combo); btn_move = QPushButton("TEST & MOVE TO SCREEN"); btn_move.setStyleSheet("background-color: #2affea; color: black; font-weight: bold; padding: 10px;"); btn_move.clicked.connect(self.trigger_move_screen); sl.addWidget(btn_move); layout.addWidget(screen_frame)
+
+        # Drawer position setting
+        drawer_frame = QFrame(); drawer_frame.setStyleSheet("border: 1px solid #444444; margin-bottom: 10px; padding: 5px;")
+        drawer_layout = QVBoxLayout(drawer_frame)
+        drawer_layout.addWidget(QLabel("DRAWER POSITION"))
+        self.drawer_pos_combo = QComboBox()
+        self.drawer_pos_combo.addItems(["Left", "Right", "Top", "Bottom"])
+        self.drawer_pos_combo.setCurrentText(self.config.get("DRAWER_POSITION", "Left"))
+        drawer_layout.addWidget(self.drawer_pos_combo)
+        layout.addWidget(drawer_frame)
+
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
         keybindings_widget = QWidget()
@@ -328,6 +338,7 @@ class SettingsDialog(QDialog):
         self.config["TARGET_SCREEN_INDEX"] = self.screen_combo.currentIndex()
         self.config["TEAM_ROLES"] = self.current_team_roles
         self.config["RSS_URL"] = self.rss_url_input.text()
+        self.config["DRAWER_POSITION"] = self.drawer_pos_combo.currentText()
         self.accept()
     def start_list(self, btn): self.listening_btn = btn; btn.setText("..."); self.grabKeyboard()
     def keyPressEvent(self, event):
@@ -367,17 +378,35 @@ class SC_ControlDeck(QMainWindow):
 
         self.create_header()
 
-        # The central widget will now be a container for the dock widgets
-        self.setCentralWidget(main_widget)
+        # New main layout with a dynamic layout for the drawer and the grid
+        self.main_content_layout = QBoxLayout(QBoxLayout.Direction.LeftToRight)
+        self.main_content_layout.setSpacing(0)
+        self.main_content_layout.setContentsMargins(0, 0, 0, 0)
 
+        # Create the drawer panel (it will be configured and placed by setup_drawer_layout)
+        self.drawer_frame = QFrame()
+        self.drawer_frame.setObjectName("drawer_frame")
+        drawer_layout = QVBoxLayout(self.drawer_frame)
+        drawer_layout.setContentsMargins(5, 5, 5, 5)
+
+        self.module_list = QListWidget()
+        self.module_list.setDragEnabled(True)
+        drawer_layout.addWidget(self.module_list)
+
+        # Create the drawer toggle button
+        self.drawer_toggle_btn = QPushButton()
+        self.drawer_toggle_btn.setObjectName("drawer_toggle_btn")
+        self.drawer_toggle_btn.clicked.connect(self.toggle_drawer)
+        self.is_drawer_open = True
+
+        # Grid widget setup
         self.modules = self.create_all_modules()
-        self.grid_widget = GridWidget(self.modules)
-        self.global_layout.addWidget(self.grid_widget)
+        self.grid_widget = GridWidget(self.modules, self)
 
-        # Create the module drawer
-        self.module_drawer = ModuleDrawer("Module Drawer", self)
-        self.module_list = self.module_drawer.module_list # Get a reference to the list widget
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.module_drawer)
+        # Initial setup of the drawer layout
+        self.setup_drawer_layout()
+
+        self.global_layout.addLayout(self.main_content_layout, 1) # Add with stretch factor
 
         self.setup_modules()
         self.create_footer()
@@ -391,6 +420,52 @@ class SC_ControlDeck(QMainWindow):
         if hasattr(self, 'action_overlay'): self.action_overlay.resize(self.size()); self.action_overlay.raise_()
         if hasattr(self, 'sys_overlay'): self.sys_overlay.resize(self.size()); self.sys_overlay.raise_()
         super().resizeEvent(event)
+
+    def setup_drawer_layout(self):
+        # Clear the existing layout
+        if self.main_content_layout.count() > 0:
+            for i in reversed(range(self.main_content_layout.count())):
+                self.main_content_layout.itemAt(i).widget().setParent(None)
+
+        pos = self.config.get("DRAWER_POSITION", "Left")
+
+        if pos in ["Left", "Right"]:
+            self.main_content_layout.setDirection(QBoxLayout.Direction.LeftToRight if pos == "Left" else QBoxLayout.Direction.RightToLeft)
+            self.drawer_frame.setFixedWidth(200)
+            self.drawer_frame.setFixedHeight(9999) # Set a large value to allow vertical stretch
+            self.drawer_toggle_btn.setFixedSize(20, 60)
+            self.drawer_toggle_btn.setText("<" if self.is_drawer_open else ">")
+        else: # Top, Bottom
+            self.main_content_layout.setDirection(QBoxLayout.Direction.TopToBottom if pos == "Top" else QBoxLayout.Direction.BottomToTop)
+            self.drawer_frame.setFixedHeight(200)
+            self.drawer_frame.setFixedWidth(9999)
+            self.drawer_toggle_btn.setFixedSize(60, 20)
+            self.drawer_toggle_btn.setText("^" if self.is_drawer_open else "v")
+
+        # Add widgets in the correct order based on position
+        if pos == "Left":
+            self.main_content_layout.addWidget(self.drawer_frame)
+            self.main_content_layout.addWidget(self.drawer_toggle_btn)
+            self.main_content_layout.addWidget(self.grid_widget)
+        elif pos == "Right":
+            self.main_content_layout.addWidget(self.grid_widget)
+            self.main_content_layout.addWidget(self.drawer_toggle_btn)
+            self.main_content_layout.addWidget(self.drawer_frame)
+        elif pos == "Top":
+            self.main_content_layout.addWidget(self.drawer_frame)
+            self.main_content_layout.addWidget(self.drawer_toggle_btn)
+            self.main_content_layout.addWidget(self.grid_widget)
+        else: # Bottom
+            self.main_content_layout.addWidget(self.grid_widget)
+            self.main_content_layout.addWidget(self.drawer_toggle_btn)
+            self.main_content_layout.addWidget(self.drawer_frame)
+
+        # Make the grid widget stretch to fill the available space
+        if pos in ["Left", "Top"]:
+            self.main_content_layout.setStretch(2, 1)
+        else: # Right, Bottom
+            self.main_content_layout.setStretch(0, 1)
+
 
     def create_all_modules(self):
         return {
@@ -466,6 +541,7 @@ class SC_ControlDeck(QMainWindow):
         if dlg.exec():
             self.config = dlg.config
             save_config(self.config)
+            self.setup_drawer_layout() # Re-apply the layout based on new settings
             if hasattr(self, 'team_management_widget'):
                 new_roles = self.config.get("TEAM_ROLES", [])
                 roles_dict = {role: "Unassigned" for role in new_roles}
@@ -474,6 +550,30 @@ class SC_ControlDeck(QMainWindow):
             if self.rss_worker.rss_url != new_rss_url:
                 self.rss_worker.rss_url = new_rss_url
                 self.rss_worker.start()
+
+    def toggle_drawer(self):
+        pos = self.config.get("DRAWER_POSITION", "Left")
+
+        if pos in ["Left", "Right"]:
+            prop = b"minimumWidth"
+            start_val = self.drawer_frame.width()
+            end_val = 0 if self.is_drawer_open else 200
+            open_char, close_char = ("<", ">") if pos == "Left" else (">", "<")
+        else: # Top, Bottom
+            prop = b"minimumHeight"
+            start_val = self.drawer_frame.height()
+            end_val = 0 if self.is_drawer_open else 200
+            open_char, close_char = ("^", "v") if pos == "Top" else ("v", "^")
+
+        self.animation = QPropertyAnimation(self.drawer_frame, prop)
+        self.animation.setDuration(300)
+        self.animation.setStartValue(start_val)
+        self.animation.setEndValue(end_val)
+        self.animation.start()
+
+        self.is_drawer_open = not self.is_drawer_open
+        self.drawer_toggle_btn.setText(close_char if self.is_drawer_open else open_char)
+
     def start_hold(self, mode):
         if self.hold_active_mode != mode:
             self.hold_active_mode = mode; self.hold_triggered = False; self.hold_progress = 0.0
@@ -594,6 +694,18 @@ class SC_ControlDeck(QMainWindow):
             QPushButton#close_btn { background-color: #220000; color: #aa0000; border: 1px solid #550000; }
             QPushButton#btn_danger { color: #ffaa00; border: 1px dashed #ffaa00; }
             QProgressBar { border: 1px solid #334455; background-color: #000000; text-align: center; color: white; }
+            QFrame#drawer_frame { background-color: #050505; border-right: 2px solid #2affea; }
+            QPushButton#drawer_toggle_btn {
+                background-color: #0a0a0a;
+                border: 1px solid #2affea;
+                border-left: none;
+                color: #2affea;
+                font-size: 16px;
+                font-weight: bold;
+                border-top-right-radius: 10px;
+                border-bottom-right-radius: 10px;
+            }
+            QPushButton#drawer_toggle_btn:hover { background-color: rgba(42, 255, 234, 0.2); }
         """)
 
 if __name__ == "__main__":
