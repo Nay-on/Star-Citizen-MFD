@@ -377,6 +377,7 @@ class SC_ControlDeck(QMainWindow):
 
         # Main layout setup
         main_widget = QWidget()
+        self.setCentralWidget(main_widget) # This is the crucial line that was missing
         self.global_layout = QVBoxLayout(main_widget)
         self.global_layout.setContentsMargins(10, 10, 10, 10)
         self.global_layout.setSpacing(5)
@@ -420,7 +421,7 @@ class SC_ControlDeck(QMainWindow):
         self.apply_styles()
 
         # Start sequences and background tasks after the main event loop has started
-        # QTimer.singleShot(100, self.start_boot_sequence) # Temporarily disabled for debugging
+        QTimer.singleShot(100, self.start_boot_sequence)
         QTimer.singleShot(200, self.start_background_tasks)
 
     def start_background_tasks(self):
@@ -687,7 +688,7 @@ class SC_ControlDeck(QMainWindow):
                     self.status_lbl.setStyleSheet("color: #44ff44; font-weight: bold;")
                 else:
                     self.status_lbl.setText("SYSTEM STATUS: OFFLINE")
-                    self.status_lbl.setStyleSheet("color: #44ff44; font-weight: bold;")
+                    self.status_lbl.setStyleSheet("color: #ff4444; font-weight: bold;")
         except RuntimeError:
             pass
     def create_shield_facing_panel(self):
