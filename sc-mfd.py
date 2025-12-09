@@ -527,21 +527,32 @@ class SC_ControlDeck(QMainWindow):
         screens = QApplication.screens()
         if screen_index < len(screens): target_screen = screens[screen_index]; self.showNormal(); self.windowHandle().setScreen(target_screen); self.move(target_screen.geometry().x(), target_screen.geometry().y()); self.showFullScreen()
     def update_rss_display(self, items):
-        if not hasattr(self, 'rss_list'): return
-        self.rss_list.clear()
-        html = ""
-        for date, title in items:
-            if date == "ERROR": html += f'<div style="margin-bottom:5px;"><span style="color:#ff5555;">[OFFLINE]</span> {title}</div>'
-            else: html += f'<div style="margin-bottom:8px;"><span style="color:#2affea; font-weight:bold;">[{date}]</span><br/><span style="color:#eeeeee;">{title}</span></div>'
-        self.rss_list.setHtml(html)
+        try:
+            if not hasattr(self, 'rss_list') or not self.rss_list:
+                return
+            self.rss_list.clear()
+            html = ""
+            for date, title in items:
+                if date == "ERROR": html += f'<div style="margin-bottom:5px;"><span style="color:#ff5555;">[OFFLINE]</span> {title}</div>'
+                else: html += f'<div style="margin-bottom:8px;"><span style="color:#2affea; font-weight:bold;">[{date}]</span><br/><span style="color:#eeeeee;">{title}</span></div>'
+            self.rss_list.setHtml(html)
+        except RuntimeError:
+            # Defensively catch "wrapped C/C++ object has been deleted" error.
+            pass
     def start_boot_sequence(self): self.sys_overlay.set_mode("BOOT"); self.boot_step = 0; self.boot_timer = QTimer(); self.boot_timer.setInterval(200); self.boot_timer.timeout.connect(self.update_boot); self.boot_timer.start()
     def update_boot(self):
-        if self.boot_step < len(BOOT_SEQUENCE_LOGS): self.sys_overlay.add_log(BOOT_SEQUENCE_LOGS[self.boot_step]); self.boot_step += 1
-        else: self.boot_timer.stop(); self.fade_timer = QTimer(); self.fade_timer.setInterval(50); self.fade_timer.timeout.connect(self.fade_out_boot); self.fade_timer.start()
+        try:
+            if self.boot_step < len(BOOT_SEQUENCE_LOGS): self.sys_overlay.add_log(BOOT_SEQUENCE_LOGS[self.boot_step]); self.boot_step += 1
+            else: self.boot_timer.stop(); self.fade_timer = QTimer(); self.fade_timer.setInterval(50); self.fade_timer.timeout.connect(self.fade_out_boot); self.fade_timer.start()
+        except RuntimeError:
+            pass
     def fade_out_boot(self):
-        op = self.sys_overlay.opacity - 0.05
-        if op <= 0: op = 0; self.fade_timer.stop(); self.sys_overlay.set_opacity(0)
-        else: self.sys_overlay.set_opacity(op)
+        try:
+            op = self.sys_overlay.opacity - 0.05
+            if op <= 0: op = 0; self.fade_timer.stop(); self.sys_overlay.set_opacity(0)
+            else: self.sys_overlay.set_opacity(op)
+        except RuntimeError:
+            pass
     def start_shutdown_sequence(self):
         self.cleanup_background_tasks()
         self.sys_overlay.set_mode("SHUTDOWN")
@@ -550,9 +561,12 @@ class SC_ControlDeck(QMainWindow):
         self.shutdown_timer.timeout.connect(self.update_shutdown)
         self.shutdown_timer.start()
     def update_shutdown(self):
-        scale = self.sys_overlay.shutdown_y_scale - 0.02
-        if scale <= 0: scale = 0; self.shutdown_timer.stop(); self.close()
-        self.sys_overlay.shutdown_y_scale = scale; self.sys_overlay.update()
+        try:
+            scale = self.sys_overlay.shutdown_y_scale - 0.02
+            if scale <= 0: scale = 0; self.shutdown_timer.stop(); self.close()
+            self.sys_overlay.shutdown_y_scale = scale; self.sys_overlay.update()
+        except RuntimeError:
+            pass
     def open_settings(self):
         dlg = SettingsDialog(self.config, self, self)
         if dlg.exec():
@@ -569,27 +583,30 @@ class SC_ControlDeck(QMainWindow):
                 self.rss_worker.start()
 
     def toggle_drawer(self):
-        pos = self.config.get("DRAWER_POSITION", "Left")
+        try:
+            pos = self.config.get("DRAWER_POSITION", "Left")
 
-        if pos in ["Left", "Right"]:
-            prop = b"minimumWidth"
-            start_val = self.drawer_frame.width()
-            end_val = 0 if self.is_drawer_open else 200
-            open_char, close_char = ("<", ">") if pos == "Left" else (">", "<")
-        else: # Top, Bottom
-            prop = b"minimumHeight"
-            start_val = self.drawer_frame.height()
-            end_val = 0 if self.is_drawer_open else 200
-            open_char, close_char = ("^", "v") if pos == "Top" else ("v", "^")
+            if pos in ["Left", "Right"]:
+                prop = b"minimumWidth"
+                start_val = self.drawer_frame.width()
+                end_val = 0 if self.is_drawer_open else 200
+                open_char, close_char = ("<", ">") if pos == "Left" else (">", "<")
+            else: # Top, Bottom
+                prop = b"minimumHeight"
+                start_val = self.drawer_frame.height()
+                end_val = 0 if self.is_drawer_open else 200
+                open_char, close_char = ("^", "v") if pos == "Top" else ("v", "^")
 
-        self.animation = QPropertyAnimation(self.drawer_frame, prop)
-        self.animation.setDuration(300)
-        self.animation.setStartValue(start_val)
-        self.animation.setEndValue(end_val)
-        self.animation.start()
+            self.animation = QPropertyAnimation(self.drawer_frame, prop)
+            self.animation.setDuration(300)
+            self.animation.setStartValue(start_val)
+            self.animation.setEndValue(end_val)
+            self.animation.start()
 
-        self.is_drawer_open = not self.is_drawer_open
-        self.drawer_toggle_btn.setText(close_char if self.is_drawer_open else open_char)
+            self.is_drawer_open = not self.is_drawer_open
+            self.drawer_toggle_btn.setText(close_char if self.is_drawer_open else open_char)
+        except RuntimeError:
+            pass
 
     def start_hold(self, mode):
         if self.hold_active_mode != mode:
@@ -607,9 +624,12 @@ class SC_ControlDeck(QMainWindow):
         else: self.command_log_widget.add_log_entry(f"SYSTEM: {self.hold_active_mode} ABORTED", is_user_action=True)
         self.hold_active_mode = None
     def update_hold_sequence(self):
-        self.hold_progress += (0.016 / 2.0)
-        if self.hold_progress >= 1.0: self.hold_progress = 1.0; self.trigger_hold_action() if not self.hold_triggered else None; self.hold_triggered = True
-        self.action_overlay.set_state(True, self.hold_progress, self.hold_triggered)
+        try:
+            self.hold_progress += (0.016 / 2.0)
+            if self.hold_progress >= 1.0: self.hold_progress = 1.0; self.trigger_hold_action() if not self.hold_triggered else None; self.hold_triggered = True
+            self.action_overlay.set_state(True, self.hold_progress, self.hold_triggered)
+        except RuntimeError:
+            pass
     def trigger_hold_action(self):
         if self.hold_active_mode == "EJECT": k = get_key_object(self.config["EXIT_SEAT"]); self.keyboard.press(k); self.command_log_widget.add_log_entry("WARNING: CANOPY JETTISONED", is_user_action=True)
         elif self.hold_active_mode == "AUTOLAND": k = get_key_object(self.config["LANDING"]); self.command_log_widget.add_log_entry("FLIGHT: AUTO-LAND ENGAGED", is_user_action=True); self.keyboard.press(k); QTimer.singleShot(3000, lambda: self.finish_auto_land_macro(k))
