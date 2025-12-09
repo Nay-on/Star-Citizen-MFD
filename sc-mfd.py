@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QGridLayout, 
                              QWidget, QLabel, QVBoxLayout, QFrame, QHBoxLayout, 
                              QDialog, QScrollArea, QProgressBar, QTextEdit, QComboBox,
-                             QLineEdit, QFileDialog, QMessageBox, QTabWidget, QListWidget)
+                             QLineEdit, QFileDialog, QMessageBox, QTabWidget, QListWidget, QDockWidget, QListWidgetItem)
 from PyQt6.QtCore import Qt, QTimer, QTime, QRectF, QEvent, QPointF, QRect, QThread, pyqtSignal
 from modules.clock_widget import ClockWidget
 from modules.draggable_module import DraggableModule
@@ -24,6 +24,7 @@ from modules.shared_widgets import HoldButton
 from modules.calculator_widget import CalculatorWidget
 from modules.auec_calculator_widget import AUECCalculatorWidget
 from modules.team_management_widget import TeamManagementWidget
+from modules.module_drawer import ModuleDrawer
 from PyQt6.QtGui import QColor, QPalette, QBrush, QPainter, QPen, QPainterPath, QLinearGradient, QPolygonF, QFont, QRadialGradient
 
 class Controller:
@@ -358,11 +359,25 @@ class SC_ControlDeck(QMainWindow):
         self.rss_refresh_timer = QTimer()
         self.rss_refresh_timer.setInterval(15 * 60 * 1000) 
         self.rss_refresh_timer.timeout.connect(self.rss_worker.start)
-        main_widget = QWidget(); self.setCentralWidget(main_widget)
-        self.global_layout = QVBoxLayout(main_widget); self.global_layout.setContentsMargins(10, 10, 10, 10); self.global_layout.setSpacing(5)
+        # Main layout setup
+        main_widget = QWidget()
+        self.global_layout = QVBoxLayout(main_widget)
+        self.global_layout.setContentsMargins(10, 10, 10, 10)
+        self.global_layout.setSpacing(5)
+
         self.create_header()
+
+        # The central widget will now be a container for the dock widgets
+        self.setCentralWidget(main_widget)
+
         self.grid_widget = GridWidget()
         self.global_layout.addWidget(self.grid_widget)
+
+        # Create the module drawer
+        self.module_drawer = ModuleDrawer("Module Drawer", self)
+        self.module_list = self.module_drawer.module_list # Get a reference to the list widget
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.module_drawer)
+
         self.setup_modules()
         self.create_footer()
         self.action_overlay = ActionOverlay(self); self.action_overlay.resize(self.size()); self.action_overlay.raise_()
@@ -386,19 +401,29 @@ class SC_ControlDeck(QMainWindow):
             "team_management": self.create_team_management_panel()
         }
         layout_config = self.config.get("MODULE_LAYOUT")
+
+        modules_on_grid = []
+
+        # Load layout from config if it exists
         if layout_config:
             for module_id, pos in layout_config.items():
                 if module_id in self.modules:
                     self.grid_widget.add_module(self.modules[module_id], pos['row'], pos['col'])
+                    modules_on_grid.append(module_id)
         else:
-            self.grid_widget.add_module(self.modules["flight_systems"], 0, 0)
-            self.grid_widget.add_module(self.modules["shield_array"], 0, 1)
-            self.grid_widget.add_module(self.modules["power_distribution"], 0, 2)
-            self.grid_widget.add_module(self.modules["telemetry"], 0, 3)
-            self.grid_widget.add_module(self.modules["calculator"], 1, 0)
-            self.grid_widget.add_module(self.modules["auec_calculator"], 1, 1)
-            self.grid_widget.add_module(self.modules["team_management"], 1, 2)
+            default_grid_modules = ["flight_systems", "shield_array", "power_distribution", "telemetry"]
+            for i, module_id in enumerate(default_grid_modules):
+                self.grid_widget.add_module(self.modules[module_id], 0, i)
+                modules_on_grid.append(module_id)
+
+        for module_id, module_widget in self.modules.items():
+            if module_id not in modules_on_grid:
+                item = QListWidgetItem(module_id)
+                item.setData(Qt.ItemDataRole.UserRole, module_id) # Store the ID in the item
+                self.module_list.addItem(item)
+                module_widget.hide()
     def closeEvent(self, event):
+        # Save the layout of modules currently on the grid
         layout_config = {}
         for i in range(self.grid_widget.layout.count()):
             widget = self.grid_widget.layout.itemAt(i).widget()
