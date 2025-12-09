@@ -370,6 +370,11 @@ class SC_ControlDeck(QMainWindow):
         self.rss_refresh_timer = QTimer()
         self.rss_refresh_timer.setInterval(15 * 60 * 1000) 
         self.rss_refresh_timer.timeout.connect(self.rss_worker.start)
+
+        # Prepare the telemetry timer, but do not start it yet.
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_telemetry)
+
         # Main layout setup
         main_widget = QWidget()
         self.global_layout = QVBoxLayout(main_widget)
@@ -412,10 +417,17 @@ class SC_ControlDeck(QMainWindow):
         self.create_footer()
         self.action_overlay = ActionOverlay(self); self.action_overlay.resize(self.size()); self.action_overlay.raise_()
         self.sys_overlay = SystemOverlay(self); self.sys_overlay.resize(self.size()); self.sys_overlay.raise_()
-        self.timer = QTimer(); self.timer.timeout.connect(self.update_telemetry); self.timer.start(1000)
         self.apply_styles()
+
+        # Start sequences and background tasks after the main event loop has started
         QTimer.singleShot(100, self.start_boot_sequence)
-        QTimer.singleShot(2000, self.rss_worker.start)
+        QTimer.singleShot(200, self.start_background_tasks)
+
+    def start_background_tasks(self):
+        """Start timers and workers that run in the background."""
+        self.timer.start(1000)
+        self.rss_worker.start()
+
     def resizeEvent(self, event):
         if hasattr(self, 'action_overlay'): self.action_overlay.resize(self.size()); self.action_overlay.raise_()
         if hasattr(self, 'sys_overlay'): self.sys_overlay.resize(self.size()); self.sys_overlay.raise_()
@@ -425,7 +437,9 @@ class SC_ControlDeck(QMainWindow):
         # Clear the existing layout
         if self.main_content_layout.count() > 0:
             for i in reversed(range(self.main_content_layout.count())):
-                self.main_content_layout.itemAt(i).widget().setParent(None)
+                widget = self.main_content_layout.itemAt(i).widget()
+                if widget:
+                    widget.setParent(None)
 
         pos = self.config.get("DRAWER_POSITION", "Left")
 
@@ -536,22 +550,22 @@ class SC_ControlDeck(QMainWindow):
                 if date == "ERROR": html += f'<div style="margin-bottom:5px;"><span style="color:#ff5555;">[OFFLINE]</span> {title}</div>'
                 else: html += f'<div style="margin-bottom:8px;"><span style="color:#2affea; font-weight:bold;">[{date}]</span><br/><span style="color:#eeeeee;">{title}</span></div>'
             self.rss_list.setHtml(html)
-        except RuntimeError as e:
-            print(f"Error in update_rss_display: {e}")
+        except RuntimeError:
+            pass
     def start_boot_sequence(self): self.sys_overlay.set_mode("BOOT"); self.boot_step = 0; self.boot_timer = QTimer(); self.boot_timer.setInterval(200); self.boot_timer.timeout.connect(self.update_boot); self.boot_timer.start()
     def update_boot(self):
         try:
             if self.boot_step < len(BOOT_SEQUENCE_LOGS): self.sys_overlay.add_log(BOOT_SEQUENCE_LOGS[self.boot_step]); self.boot_step += 1
             else: self.boot_timer.stop(); self.fade_timer = QTimer(); self.fade_timer.setInterval(50); self.fade_timer.timeout.connect(self.fade_out_boot); self.fade_timer.start()
-        except RuntimeError as e:
-            print(f"Error in update_boot: {e}")
+        except RuntimeError:
+            pass
     def fade_out_boot(self):
         try:
             op = self.sys_overlay.opacity - 0.05
             if op <= 0: op = 0; self.fade_timer.stop(); self.sys_overlay.set_opacity(0)
             else: self.sys_overlay.set_opacity(op)
-        except RuntimeError as e:
-            print(f"Error in fade_out_boot: {e}")
+        except RuntimeError:
+            pass
     def start_shutdown_sequence(self):
         self.cleanup_background_tasks()
         self.sys_overlay.set_mode("SHUTDOWN")
@@ -564,8 +578,8 @@ class SC_ControlDeck(QMainWindow):
             scale = self.sys_overlay.shutdown_y_scale - 0.02
             if scale <= 0: scale = 0; self.shutdown_timer.stop(); self.close()
             self.sys_overlay.shutdown_y_scale = scale; self.sys_overlay.update()
-        except RuntimeError as e:
-            print(f"Error in update_shutdown: {e}")
+        except RuntimeError:
+            pass
     def open_settings(self):
         dlg = SettingsDialog(self.config, self, self)
         if dlg.exec():
@@ -604,8 +618,8 @@ class SC_ControlDeck(QMainWindow):
 
             self.is_drawer_open = not self.is_drawer_open
             self.drawer_toggle_btn.setText(close_char if self.is_drawer_open else open_char)
-        except RuntimeError as e:
-            print(f"Error in toggle_drawer: {e}")
+        except RuntimeError:
+            pass
 
     def start_hold(self, mode):
         if self.hold_active_mode != mode:
@@ -627,8 +641,8 @@ class SC_ControlDeck(QMainWindow):
             self.hold_progress += (0.016 / 2.0)
             if self.hold_progress >= 1.0: self.hold_progress = 1.0; self.trigger_hold_action() if not self.hold_triggered else None; self.hold_triggered = True
             self.action_overlay.set_state(True, self.hold_progress, self.hold_triggered)
-        except RuntimeError as e:
-            print(f"Error in update_hold_sequence: {e}")
+        except RuntimeError:
+            pass
     def trigger_hold_action(self):
         if self.hold_active_mode == "EJECT": k = get_key_object(self.config["EXIT_SEAT"]); self.keyboard.press(k); self.command_log_widget.add_log_entry("WARNING: CANOPY JETTISONED", is_user_action=True)
         elif self.hold_active_mode == "AUTOLAND": k = get_key_object(self.config["LANDING"]); self.command_log_widget.add_log_entry("FLIGHT: AUTO-LAND ENGAGED", is_user_action=True); self.keyboard.press(k); QTimer.singleShot(3000, lambda: self.finish_auto_land_macro(k))
@@ -674,8 +688,8 @@ class SC_ControlDeck(QMainWindow):
                 else:
                     self.status_lbl.setText("SYSTEM STATUS: OFFLINE")
                     self.status_lbl.setStyleSheet("color: #44ff44; font-weight: bold;")
-        except RuntimeError as e:
-            print(f"Error in update_telemetry: {e}")
+        except RuntimeError:
+            pass
     def create_shield_facing_panel(self):
         module = DraggableModule("shield_array")
         layout = QVBoxLayout(module)
