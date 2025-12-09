@@ -502,6 +502,14 @@ class SC_ControlDeck(QMainWindow):
                 self.module_list.addItem(item)
                 module_widget.hide()
     def closeEvent(self, event):
+        # Stop all running timers and threads to prevent RuntimeError on shutdown
+        self.timer.stop()
+        self.rss_refresh_timer.stop()
+        self.hold_timer.stop()
+        if self.rss_worker.isRunning():
+            self.rss_worker.quit()
+            self.rss_worker.wait() # Wait for the thread to finish cleanly
+
         # Save the layout of modules currently on the grid
         layout_config = {}
         for i in range(self.grid_widget.layout.count()):
