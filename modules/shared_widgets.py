@@ -1,5 +1,6 @@
-from PyQt6.QtWidgets import QPushButton
+from PyQt6.QtWidgets import QPushButton, QListWidget, QListWidgetItem
 from PyQt6.QtCore import Qt, QEvent
+from modules.draggable_module import DraggableModule
 
 class HoldButton(QPushButton):
     def __init__(self, text, parent=None):
@@ -26,3 +27,34 @@ class HoldButton(QPushButton):
     def mouseReleaseEvent(self, e):
         if self.on_release_callback: self.on_release_callback()
         super().mouseReleaseEvent(e)
+
+class DroppableListWidget(QListWidget):
+    def __init__(self, main_window, parent=None):
+        super().__init__(parent)
+        self.main_window = main_window
+        self.setAcceptDrops(True)
+        self.setDragEnabled(True)
+
+    def dragEnterEvent(self, event):
+        event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        source_widget = event.source()
+
+        # Check if the source is a DraggableModule from the grid
+        if isinstance(source_widget, DraggableModule) and source_widget.parent() == self.main_window.grid_widget:
+            module_id = source_widget.module_id
+
+            # Add the item back to the list
+            item = QListWidgetItem(module_id)
+            item.setData(Qt.ItemDataRole.UserRole, module_id)
+            self.addItem(item)
+
+            # Hide the widget on the grid (it will be reparented/deleted by the grid logic)
+            source_widget.hide()
+            self.main_window.grid_widget.layout.removeWidget(source_widget)
+            source_widget.setParent(None)
+
+            event.acceptProposedAction()
+        else:
+            super().dropEvent(event)

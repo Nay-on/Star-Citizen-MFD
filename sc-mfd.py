@@ -20,7 +20,7 @@ from modules.command_log_widget import CommandLogWidget
 from modules.shield_array_widget import ShieldArrayWidget
 from modules.flight_systems_widget import FlightSystemsWidget
 from modules.power_distribution_widget import PowerDistributionWidget
-from modules.shared_widgets import HoldButton
+from modules.shared_widgets import HoldButton, DroppableListWidget
 from modules.calculator_widget import CalculatorWidget
 from modules.auec_calculator_widget import AUECCalculatorWidget
 from modules.team_management_widget import TeamManagementWidget
@@ -395,8 +395,7 @@ class SC_ControlDeck(QMainWindow):
         drawer_layout = QVBoxLayout(self.drawer_frame)
         drawer_layout.setContentsMargins(5, 5, 5, 5)
 
-        self.module_list = QListWidget()
-        self.module_list.setDragEnabled(True)
+        self.module_list = DroppableListWidget(self)
         drawer_layout.addWidget(self.module_list)
 
         # Create the drawer toggle button
@@ -445,17 +444,19 @@ class SC_ControlDeck(QMainWindow):
         pos = self.config.get("DRAWER_POSITION", "Left")
 
         if pos in ["Left", "Right"]:
-            self.main_content_layout.setDirection(QBoxLayout.Direction.LeftToRight if pos == "Left" else QBoxLayout.Direction.RightToLeft)
-            self.drawer_frame.setFixedWidth(200)
-            self.drawer_frame.setFixedHeight(9999) # Set a large value to allow vertical stretch
+            self.main_content_layout.setDirection(QBoxLayout.Direction.LeftToRight)
+            self.drawer_frame.setMaximumWidth(200 if self.is_drawer_open else 0)
+            self.drawer_frame.setMaximumHeight(9999)
             self.drawer_toggle_btn.setFixedSize(20, 60)
-            self.drawer_toggle_btn.setText("<" if self.is_drawer_open else ">")
+            open_char, close_char = ("<", ">") if pos == "Left" else (">", "<")
+            self.drawer_toggle_btn.setText(open_char if self.is_drawer_open else close_char)
         else: # Top, Bottom
-            self.main_content_layout.setDirection(QBoxLayout.Direction.TopToBottom if pos == "Top" else QBoxLayout.Direction.BottomToTop)
-            self.drawer_frame.setFixedHeight(200)
-            self.drawer_frame.setFixedWidth(9999)
+            self.main_content_layout.setDirection(QBoxLayout.Direction.TopToBottom)
+            self.drawer_frame.setMaximumHeight(200 if self.is_drawer_open else 0)
+            self.drawer_frame.setMaximumWidth(9999)
             self.drawer_toggle_btn.setFixedSize(60, 20)
-            self.drawer_toggle_btn.setText("^" if self.is_drawer_open else "v")
+            open_char, close_char = ("^", "v") if pos == "Top" else ("v", "^")
+            self.drawer_toggle_btn.setText(open_char if self.is_drawer_open else close_char)
 
         # Add widgets in the correct order based on position
         if pos == "Left":
