@@ -31,7 +31,7 @@ class GridWidget(QWidget):
         for i in range(self.layout.count()):
             item = self.layout.itemAt(i)
             if item and item.widget() and item.geometry().contains(pos):
-                _, r, c, _, _ = self.layout.getItemPosition(i)
+                r, c, _, _ = self.layout.getItemPosition(i)
                 return r, c
 
         # If not over a widget (empty cell), calculate based on overall grid geometry
