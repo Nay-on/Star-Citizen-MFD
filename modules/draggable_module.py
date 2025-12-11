@@ -7,8 +7,8 @@ class DraggableModule(QFrame):
         super().__init__(parent)
         self.setObjectName("panel_frame")
         self.module_id = module_id
-        # Prevent the widget from expanding vertically
-        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        # Allow horizontal expansion but keep vertical size fixed
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
