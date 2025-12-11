@@ -16,9 +16,12 @@ class GridWidget(QWidget):
 
         # Initialize grid with stretch factors to ensure cells resize correctly
         for r in range(self.rows):
-            self.layout.setRowStretch(r, 1)
+            self.layout.setRowStretch(r, 0) # Rows with widgets should not expand
         for c in range(self.cols):
             self.layout.setColumnStretch(c, 1)
+
+        # Add a spacer row at the bottom to absorb extra vertical space
+        self.layout.setRowStretch(self.rows, 1)
 
         self.setAcceptDrops(True)
 

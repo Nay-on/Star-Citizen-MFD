@@ -482,6 +482,40 @@ class SC_ControlDeck(QMainWindow):
         else: # Right, Bottom
             self.main_content_layout.setStretch(0, 1)
 
+        # Dynamically set the stylesheet for the toggle button
+        base_style = """
+            background-color: #0a0a0a;
+            border: 1px solid #2affea;
+            color: #2affea;
+            font-size: 16px;
+            font-weight: bold;
+        """
+        if pos == "Left":
+            style = base_style + """
+                border-left: none;
+                border-top-right-radius: 10px;
+                border-bottom-right-radius: 10px;
+            """
+        elif pos == "Right":
+            style = base_style + """
+                border-right: none;
+                border-top-left-radius: 10px;
+                border-bottom-left-radius: 10px;
+            """
+        elif pos == "Top":
+            style = base_style + """
+                border-top: none;
+                border-bottom-left-radius: 10px;
+                border-bottom-right-radius: 10px;
+            """
+        else: # Bottom
+            style = base_style + """
+                border-bottom: none;
+                border-top-left-radius: 10px;
+                border-top-right-radius: 10px;
+            """
+        self.drawer_toggle_btn.setStyleSheet(style)
+
 
     def create_all_modules(self):
         return {
@@ -753,16 +787,6 @@ class SC_ControlDeck(QMainWindow):
             QPushButton#btn_danger { color: #ffaa00; border: 1px dashed #ffaa00; }
             QProgressBar { border: 1px solid #334455; background-color: #000000; text-align: center; color: white; }
             QFrame#drawer_frame { background-color: #050505; border-right: 2px solid #2affea; }
-            QPushButton#drawer_toggle_btn {
-                background-color: #0a0a0a;
-                border: 1px solid #2affea;
-                border-left: none;
-                color: #2affea;
-                font-size: 16px;
-                font-weight: bold;
-                border-top-right-radius: 10px;
-                border-bottom-right-radius: 10px;
-            }
             QPushButton#drawer_toggle_btn:hover { background-color: rgba(42, 255, 234, 0.2); }
         """)
 
