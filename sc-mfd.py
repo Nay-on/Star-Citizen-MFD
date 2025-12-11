@@ -599,20 +599,19 @@ class SC_ControlDeck(QMainWindow):
     def toggle_drawer(self):
         try:
             pos = self.config.get("DRAWER_POSITION", "Left")
+            end_val = 0 if self.is_drawer_open else 200
 
             if pos in ["Left", "Right"]:
-                prop = b"minimumWidth"
+                prop = b"maximumWidth"
                 start_val = self.drawer_frame.width()
-                end_val = 0 if self.is_drawer_open else 200
-                open_char, close_char = ("<", ">") if pos == "Left" else (">", "<")
+                close_char, open_char = ("<", ">") if pos == "Left" else (">", "<")
             else: # Top, Bottom
-                prop = b"minimumHeight"
+                prop = b"maximumHeight"
                 start_val = self.drawer_frame.height()
-                end_val = 0 if self.is_drawer_open else 200
-                open_char, close_char = ("^", "v") if pos == "Top" else ("v", "^")
+                close_char, open_char = ("^", "v") if pos == "Top" else ("v", "^")
 
             self.animation = QPropertyAnimation(self.drawer_frame, prop)
-            self.animation.setDuration(300)
+            self.animation.setDuration(250)
             self.animation.setStartValue(start_val)
             self.animation.setEndValue(end_val)
             self.animation.start()
